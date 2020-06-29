@@ -15,6 +15,7 @@
 DIRECTORY="/var/lib/libvirt/images"
 KEY_DIRECTORY="/root/.ssh"
 TEMPLATE="templates/rhel8-template.cfg"
+SOURCE_DIRECTORY=$(pwd)
 DISK_SIZE=
 PUBLIC_KEY=
 VALIDITY=
@@ -34,8 +35,9 @@ fi
 
 # Create Metadata
 mkdir -vp "$DIRECTORY/$MACHINE_NAME"
-echo "instance-id: $MACHINE_NAME" > "$DIRECTORY/$MACHINE_NAME/meta-data"
-echo "local-hostname: $MACHINE_NAME" >> "$DIRECTORY/$MACHINE_NAME/meta-data"
+cd "$DIRECTORY/$MACHINE_NAME"
+echo "instance-id: $MACHINE_NAME" > "meta-data"
+echo "local-hostname: $MACHINE_NAME" >> "meta-data"
 
 # Create userdata
 ssh-keygen -o -q -t ed25519 -C "Key for VM $MACHINE_NAME" -f "$KEY_DIRECTORY/$MACHINE_NAME" -N ""
@@ -44,11 +46,11 @@ sed -e "s|{{HOSTNAME}}|$MACHINE_NAME|" \
     -e "s|{{FQDN}}|$DOMAIN_NAME|"      \
     -e "s|{{USER}}|$USERNAME|"         \
     -e "s|{{PUBKEY}}|$PUBLIC_KEY|"     \
-    -e "s|{{LOCALE}}|$LOCALE|" $TEMPLATE > "$DIRECTORY/$MACHINE_NAME/user-data"
+    -e "s|{{LOCALE}}|$LOCALE|" $SOURCE_DIRECTORY/$TEMPLATE > "user-data"
 
 # Validate generated config
-VALIDITY=$(cloud-init devel schema --config-file "$DIRECTORY/$MACHINE_NAME/user-data")
-if [ ${VALIDITY%% *} == "Valid" ]; then
+VALIDITY=$(cloud-init devel schema --config-file user-data)
+if [ "${VALIDITY%% *}" == "Valid" ]; then
     echo "-- Valid Configuration Generated --"
 else
     echo "-- ERROR - Invalid Config Generated - Check Inputs --"
@@ -57,10 +59,29 @@ fi
 
 # Copy the install image
 echo "-- Creating installation image --"
-cp "$INSTALL_IMAGE" "$DIRECTORY/$MACHINE_NAME/$MACHINE_NAME.qcow2"
+cp "$INSTALL_IMAGE" "$MACHINE_NAME.qcow2"
 
 # Create disk image for install
 echo "-- Building disk image --"
-qemu-img create -f qcow2 -o preallocation=metadata "$DIRECTORY/$MACHINE_NAME/MACHINE_NAME.image" $DISK_SIZE
-virt-resize --quiet --expand "/dev/sda1" "$DIRECTORY/$MACHINE_NAME/$MACHINE_NAME.qcow2" "$DIRECTORY/$MACHINE_NAME/$MACHINE_NAME.image.qcow2"
-mv -f "$DIRECTORY/$MACHINE_NAME/$MACHINE_NAME.image.qcow2" "$DIRECTORY/$MACHINE_NAME/$MACHINE_NAME.qcow2" 
+qemu-img create -f qcow2 -o preallocation=metadata "$MACHINE_NAME.image" $DISK_SIZE
+virt-resize --quiet --expand "/dev/sda1" "$MACHINE_NAME.qcow2" "$MACHINE_NAME.image"
+mv -f "$MACHINE_NAME.image" "$MACHINE_NAME.qcow2" 
+# Create initialization iso
+echo "-- Creating cloud-init iso --"
+mkisofs -o "$MACHINE_NAME-cidata.iso" -V cidata -J -r "user-data" "meta-data"
+
+# Create the VM
+virt-install --import --name $MACHINE_NAME            \
+--memory 2048 --vcpus 2 --cpu host                    \
+--disk $MACHINE_NAME.qcow2,format=qcow2,bus=virtio    \
+--disk $MACHINE_NAME-cidata.iso,device=cdrom          \
+--network bridge=br0,model=virtio                     \
+--os-variant=rhel8.1                                  \
+--graphics vnc                                        \
+--noautoconsole
+
+# Cleanup
+virsh change-media $MACHINE_NAME sda --eject --config
+rm "meta-data" "user-data" $MACHINE_NAME-cidata.iso
+cd -
+
