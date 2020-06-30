@@ -14,7 +14,7 @@
 # VARIABLES
 DIRECTORY="/var/lib/libvirt/images"
 KEY_DIRECTORY="/root/.ssh"
-TEMPLATE="templates/rhel8-template.cfg"
+TEMPLATE="templates/centos8-template"
 SOURCE_DIRECTORY=$(pwd)
 DISK_SIZE=
 PUBLIC_KEY=
@@ -73,7 +73,7 @@ mkisofs -o "$MACHINE_NAME-cidata.iso" -V cidata -J -r "user-data" "meta-data"
 # Create the VM
 virt-install --import --name $MACHINE_NAME            \
 --memory 2048 --vcpus 2 --cpu host                    \
---disk $MACHINE_NAME.qcow2,format=qcow2,bus=virtio    \
+--disk $MACHINE_NAME.qcow2,format=qcow2,device=disk,bus=virtio    \
 --disk $MACHINE_NAME-cidata.iso,device=cdrom          \
 --network bridge=br0,model=virtio                     \
 --os-variant=rhel8.1                                  \
