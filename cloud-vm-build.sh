@@ -6,10 +6,10 @@
 
 # REQUIREMENTS
 # cloud-init
-# 
+# libvirt
 
 # Usage (Run as root):
-# $ ./cloud-vm-build.sh [INSTALL-IMAGE] [MACHINE-NAME] [DOMIAN-NAME] [USERNAME] [LOCALE] [DISK-SIZE]
+# $ ./cloud-vm-build.sh [INSTALL-IMAGE] [MACHINE-NAME] [USERNAME] [LOCALE] [DISK-SIZE]
 
 # VARIABLES
 DIRECTORY="/var/lib/libvirt/images"
@@ -21,13 +21,12 @@ PUBLIC_KEY=
 VALIDITY=
 INSTALL_IMAGE=$1
 MACHINE_NAME=$2
-DOMAIN_NAME=$3
-USERNAME=$4
-LOCALE=$5
-if [ -z $6 ]; then
+USERNAME=$3
+LOCALE=$4
+if [ -z $5 ]; then
     DISK_SIZE="10G"
-elif [[ "$6" =~ ^[0-9]{1,4}G$ ]]; then
-    DISK_SIZE=$6
+elif [[ "$5" =~ ^[0-9]{1,4}G$ ]]; then
+    DISK_SIZE=$5
 else
     echo "-- ERROR - Please enter valid disk size variable i.e. \"20G\" --"
     exit 1
@@ -43,7 +42,6 @@ echo "local-hostname: $MACHINE_NAME" >> "meta-data"
 ssh-keygen -o -q -t ed25519 -C "Key for VM $MACHINE_NAME" -f "$KEY_DIRECTORY/$MACHINE_NAME" -N ""
 PUBLIC_KEY=$(cat $KEY_DIRECTORY/$MACHINE_NAME.pub)
 sed -e "s|{{HOSTNAME}}|$MACHINE_NAME|" \
-    -e "s|{{FQDN}}|$DOMAIN_NAME|"      \
     -e "s|{{USER}}|$USERNAME|"         \
     -e "s|{{PUBKEY}}|$PUBLIC_KEY|"     \
     -e "s|{{LOCALE}}|$LOCALE|" $SOURCE_DIRECTORY/$TEMPLATE > "user-data"
@@ -83,5 +81,7 @@ virt-install --import --name $MACHINE_NAME            \
 # Cleanup
 virsh change-media $MACHINE_NAME sda --eject --config
 rm "meta-data" "user-data" $MACHINE_NAME-cidata.iso
+rm -f "$KEY_DIRECTORY/$MACHINE_NAME.pub"
 cd -
 
+echo "-- SSH Key for $MACHINE_NAME is located in $KEY_DIRECTORY/$MACHINE_NAME --"

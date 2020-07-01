@@ -3,7 +3,6 @@
 # Hostname management
 preserve_hostname: False
 hostname: {{HOSTNAME}}
-fqdn: {{FQDN}}
  
 # Users
 users:
@@ -12,8 +11,6 @@ users:
     groups: ['wheel']
     shell: /bin/bash
     sudo: ALL=(ALL) NOPASSWD:ALL
-    lock-passwd: false
-    passwd: {{PWD}} #Supply from extraneous config
     ssh-authorized-keys:
       - {{PUBKEY}}
       
