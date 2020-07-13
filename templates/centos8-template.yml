@@ -11,7 +11,7 @@ users:
     groups: ['wheel']
     shell: /bin/bash
     sudo: ALL=(ALL) NOPASSWD:ALL
-    ssh-authorized-keys:
+    ssh_authorized_keys:
       - {{PUBKEY}}
       
 output:

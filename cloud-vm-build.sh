@@ -14,8 +14,8 @@
 # VARIABLES
 DIRECTORY="/var/lib/libvirt/images"
 KEY_DIRECTORY="/root/.ssh"
-TEMPLATE="templates/centos8-template"
-SOURCE_DIRECTORY=$(pwd)
+TEMPLATE="templates/centos8-template.yml"
+SOURCE_DIRECTORY="/home/admin/repos/autokvm"
 DISK_SIZE=
 PUBLIC_KEY=
 VALIDITY=
@@ -74,8 +74,8 @@ virt-install --import --name $MACHINE_NAME            \
 --disk $MACHINE_NAME.qcow2,format=qcow2,device=disk,bus=virtio    \
 --disk $MACHINE_NAME-cidata.iso,device=cdrom          \
 --network bridge=br0,model=virtio                     \
---os-variant=rhel8.1                                  \
---graphics vnc                                        \
+--os-variant centos8                                  \
+--graphics none                                       \
 --noautoconsole
 
 # Cleanup

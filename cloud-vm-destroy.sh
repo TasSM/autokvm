@@ -7,6 +7,7 @@
 # Usage (Run as root)
 
 VM=$1
+if [ -z $VM ]; then exit 1; fi
 echo "-- This script will PERMENANTLY DESTROY THE INSTANCE $VM --"
 echo "--! Press ENTER to proceed or any key to exit !--"
 read -sn1 
