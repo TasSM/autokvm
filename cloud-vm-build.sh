@@ -9,7 +9,7 @@
 # libvirt
 
 # Usage (Run as root):
-# $ ./cloud-vm-build.sh [INSTALL-IMAGE] [MACHINE-NAME] [USERNAME] [LOCALE] [DISK-SIZE]
+# $ cloud-vm-build.sh [INSTALL-IMAGE] [MACHINE-NAME] [USERNAME] [LOCALE] [DISK-SIZE]
 
 # VARIABLES
 DIRECTORY="/var/lib/libvirt/images"
@@ -85,3 +85,4 @@ rm -f "$KEY_DIRECTORY/$MACHINE_NAME.pub"
 cd -
 
 echo "-- SSH Key for $MACHINE_NAME is located in $KEY_DIRECTORY/$MACHINE_NAME --"
+exit 0

@@ -21,3 +21,4 @@ virsh destroy $VM && virsh undefine $VM
 rm -r $DATA_DIRECTORY
 rm -f "$KEY_DIRECTORY/$VM" && rm -f "$KEY_DIRECTORY/$VM.pub"
 echo "-- DONE --"
+exit 0
