@@ -8,21 +8,44 @@
 # cloud-init
 # libvirt
 
-# Usage (Run as root):
-# $ cloud-vm-build.sh [INSTALL-IMAGE] [MACHINE-NAME] [USERNAME] [LOCALE] [DISK-SIZE]
-
 # VARIABLES
 DIRECTORY="/var/lib/libvirt/images"
 KEY_DIRECTORY="/root/.ssh"
+# TODO: REWRITE AS ARGUMENT
 TEMPLATE="templates/centos8-template.yml"
-SOURCE_DIRECTORY="/home/admin/repos/autokvm"
+#
 DISK_SIZE=
 PUBLIC_KEY=
 VALIDITY=
 INSTALL_IMAGE=$1
 MACHINE_NAME=$2
 USERNAME=$3
-LOCALE=$4
+IP_CONFIG=
+
+
+LOCALE=
+IP_ADDRESS=
+GATEWAY=
+DNS=
+PREFIX=
+
+### FUNCTIONS ###
+
+usage() {
+    echo "-- USAGE --"
+    echo "A script to deploy a VM from a cloud image"
+    echo "Tested on RHEL 8"
+    echo ""
+    echo "$0 [] [] []"
+    echo ""
+    echo "[-h] This Message"
+    echo ""
+    echo "--end--"
+}
+
+### MAIN ###
+
+# Default disk size to 10G or fail if size invalid
 if [ -z $5 ]; then
     DISK_SIZE="10G"
 elif [[ "$5" =~ ^[0-9]{1,4}G$ ]]; then
@@ -32,19 +55,37 @@ else
     exit 1
 fi
 
-# Create Metadata
-mkdir -vp "$DIRECTORY/$MACHINE_NAME"
-cd "$DIRECTORY/$MACHINE_NAME"
-echo "instance-id: $MACHINE_NAME" > "meta-data"
-echo "local-hostname: $MACHINE_NAME" >> "meta-data"
+# Read IP configuration file
+if [ -f $IP_CONFIG ]; then
+    source $IP_CONFIG
+else
+    echo "-- IP configuration file is invalid [Run with -h flag for usage]"
+    exit 1
+fi
 
-# Create userdata
+# TODO: ADD SIGINT SIGKILL traps
+
+# TODO: image download process using wget
+
+# Evaluate system parameters
+LOCALE=$(timedatectl | grep "Time zone" | sed -e 's/.*zone:\ //' -e 's/\ (.*//')
+
+# Create cloud-init metadata
+mkdir -vp "$DIRECTORY/$MACHINE_NAME"
+echo "instance-id: $MACHINE_NAME" > "$DIRECTORY/meta-data"
+echo "local-hostname: $MACHINE_NAME" >> "$DIRECTORY/meta-data"
+
+# Create cloud-init userdata
 ssh-keygen -o -q -t ed25519 -C "Key for VM $MACHINE_NAME" -f "$KEY_DIRECTORY/$MACHINE_NAME" -N ""
 PUBLIC_KEY=$(cat $KEY_DIRECTORY/$MACHINE_NAME.pub)
 sed -e "s|{{HOSTNAME}}|$MACHINE_NAME|" \
     -e "s|{{USER}}|$USERNAME|"         \
     -e "s|{{PUBKEY}}|$PUBLIC_KEY|"     \
-    -e "s|{{LOCALE}}|$LOCALE|" $SOURCE_DIRECTORY/$TEMPLATE > "user-data"
+    -e "s|{{LOCALE}}|$LOCALE|" $SOURCE_DIRECTORY/$TEMPLATE \
+    -e "s|{{IP_ADDRESS}}|$IP_ADDRESS|" \
+    -e "s|{{GATEWAY}}|$GATEWAY|" \
+    -e "s|{{PREFIX}}|$PREFIX|" \
+    -e "s|{{DNS}}|$DNS|" > "user-data"
 
 # Validate generated config
 VALIDITY=$(cloud-init devel schema --config-file user-data)
@@ -57,22 +98,23 @@ fi
 
 # Copy the install image
 echo "-- Creating installation image --"
-cp "$INSTALL_IMAGE" "$MACHINE_NAME.qcow2"
+cp "$INSTALL_IMAGE" "$DIRECTORY/$MACHINE_NAME.qcow2"
 
 # Create disk image for install
 echo "-- Building disk image --"
-qemu-img create -f qcow2 -o preallocation=metadata "$MACHINE_NAME.image" $DISK_SIZE
-virt-resize --quiet --expand "/dev/sda1" "$MACHINE_NAME.qcow2" "$MACHINE_NAME.image"
-mv -f "$MACHINE_NAME.image" "$MACHINE_NAME.qcow2" 
+qemu-img create -f qcow2 -o preallocation=metadata "$DIRECTORY/$MACHINE_NAME.image" $DISK_SIZE
+virt-resize --quiet --expand "/dev/sda1" "$DIRECTORY/$MACHINE_NAME.qcow2" "$DIRECTORY/$MACHINE_NAME.image"
+mv -f "$DIRECTORY/$MACHINE_NAME.image" "$DIRECTORY/$MACHINE_NAME.qcow2" 
+
 # Create initialization iso
 echo "-- Creating cloud-init iso --"
-mkisofs -o "$MACHINE_NAME-cidata.iso" -V cidata -J -r "user-data" "meta-data"
+mkisofs -o "$DIRECTORY/$MACHINE_NAME-cidata.iso" -V cidata -J -r "user-data" "meta-data"
 
 # Create the VM
 virt-install --import --name $MACHINE_NAME            \
 --memory 2048 --vcpus 2 --cpu host                    \
---disk $MACHINE_NAME.qcow2,format=qcow2,device=disk,bus=virtio    \
---disk $MACHINE_NAME-cidata.iso,device=cdrom          \
+--disk $DIRECTORY/$MACHINE_NAME.qcow2,format=qcow2,device=disk,bus=virtio    \
+--disk $DIRECTORY/$MACHINE_NAME-cidata.iso,device=cdrom          \
 --network bridge=br0,model=virtio                     \
 --os-variant centos8                                  \
 --graphics none                                       \
@@ -80,9 +122,9 @@ virt-install --import --name $MACHINE_NAME            \
 
 # Cleanup
 virsh change-media $MACHINE_NAME sda --eject --config
-rm "meta-data" "user-data" $MACHINE_NAME-cidata.iso
+rm "meta-data" "user-data" $DIRECTORY/$MACHINE_NAME-cidata.iso
 rm -f "$KEY_DIRECTORY/$MACHINE_NAME.pub"
-cd -
+#cd -
 
 echo "-- SSH Key for $MACHINE_NAME is located in $KEY_DIRECTORY/$MACHINE_NAME --"
 exit 0
