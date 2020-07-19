@@ -15,18 +15,13 @@ usage() {
     echo ""
     echo "[-h --help] This Message"
     echo ""
-    echo "--end--"
+    echo "-- END --"
 }
 
 ### MAIN ###
 
 if [[ "$#" != 1 || "$1" == "-h" || "$1" == "--help"]]; then
-    usage
-    exit 1
-fi
-
-BRIDGE_NAME=$1
-BRIDGE_SLAVE="bridge-slave-$BRIDGE_NAME"
+## Installation
 
 nmcli conn down $BRIDGE_NAME
 nmcli conn del $BRIDGE_NAME

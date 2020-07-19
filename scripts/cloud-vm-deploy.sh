@@ -4,10 +4,6 @@
 # @author Tasman Mayers
 # @date June 2020
 
-# REQUIREMENTS
-# cloud-init
-# libvirt
-
 # SCRIPT VARS
 MACHINE_NAME=$1
 OPERATING_SYSTEM=$2
@@ -21,7 +17,7 @@ USERDATA_FILE=
 # PATHS
 LIBVIRT_BOOT_DIR="/var/lib/libvirt/boot"
 LIBVIRT_IMAGE_DIR="/var/lib/libvirt/images"
-AUTOKVM_CONFIG_DIR="/etc/autokvm.conf.d"
+AUTOKVM_CONFIG_DIR="/etc/autokvm.cfg.d"
 TEMPLATE_DIR="$AUTOKVM_CONFIG_DIR/templates"
 OS_FILE="$AUTOKVM_CONFIG_DIR/operating-systems.conf"
 
@@ -49,7 +45,9 @@ NETMASK=
 
 clup() {
     echo "-- KILLED: Running Cleanup Job --"
+    virsh destroy $MACHINE_NAME && virsh undefine $MACHINE_NAME
     rm -rf "$LIBVIRT_IMAGE_DIR/$MACHINE_NAME"
+    rm -f "$SSH_KEY_DIRECTORY/$MACHINE_NAME" && rm -f "$SSH_KEY_DIRECTORY/$MACHINE_NAME.pub"
 }
 
 usage() {
@@ -186,4 +184,6 @@ if [ "$PRESERVE_PUBKEY" != "true" ]; then
 fi
 
 echo "-- SSH Key for $MACHINE_NAME is located in $SSH_KEY_DIRECTORY/$MACHINE_NAME --"
+echo "-- Connect to host with: ssh $USERNAME@$IP_ADDRESS -i $SSH_KEY_DIRECTORY/$MACHINE_NAME -- "
+echo "-- DONE --"
 exit 0

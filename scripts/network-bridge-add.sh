@@ -28,7 +28,7 @@ usage() {
     echo ""
     echo "[-h --help] This Message"
     echo ""
-    echo "--end--"
+    echo "-- END --"
 }
 
 escape() {
