@@ -23,9 +23,4 @@ ssh_authorized_keys:
 timezone: {{LOCALE}}
 runcmd:
   - systemctl stop NetworkManager.service && systemctl start NetworkManager.service
-  - nmcli connection mod eth0 ipv4.gateway {{GATEWAY}}
-  - nmcli connection mod eth0 ipv4.addresses {{IP_ADDRESS}}/{{PREFIX}}
-  - nmcli connection mod eth0 ipv4.dns {{DNS}}
-  - nmcli connection mod eth0 ipv4.method manual
-  - nmcli connection reload eth0
   - dnf -y remove cloud-init

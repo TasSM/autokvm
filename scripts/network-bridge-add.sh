@@ -12,7 +12,8 @@ BRIDGE_SLAVE="bridge-slave-$BRIDGE_NAME"
 # Config file vars
 IP_ADDRESS=
 GATEWAY=
-DNS=
+DNS1=
+DNS2=
 PREFIX=
 
 ### FUNCTIONS ###
@@ -25,7 +26,7 @@ usage() {
     echo "$0 [CONNECTION_NAME] [BRIDGE_NAME] [IP_CONFIG_FILE_PATH]"
     echo "EXAMPLE: $0 eth0 br0 static-ip.conf"
     echo ""
-    echo "[-h] This Message"
+    echo "[-h --help] This Message"
     echo ""
     echo "--end--"
 }
@@ -41,7 +42,7 @@ escape() {
 ### MAIN ###
 
 # Display usage message
-if [[ "$1" == "-h" || "$1" == "" || "$#" != 3 ]]; then
+if [[ "$1" == "-h" || "$1" == "--help" || -z $1 || "$#" != 3 ]]; then
     usage
     exit 1
 fi
@@ -62,7 +63,7 @@ trap escape SIGTERM SIGINT
 # Configure the bridge with static IP configuration
 nmcli conn modify $BRIDGE_NAME ipv4.addresses "$IP_ADDRESS/$PREFIX"
 nmcli conn modify $BRIDGE_NAME ipv4.gateway $GATEWAY
-nmcli conn modify $BRIDGE_NAME ipv4.dns $DNS
+nmcli conn modify $BRIDGE_NAME ipv4.dns "$DNS1 $DNS2"
 nmcli conn modify $BRIDGE_NAME ipv4.method "manual"
 
 # Add interface as bridge slave

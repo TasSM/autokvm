@@ -13,14 +13,14 @@ usage() {
     echo ""
     echo "$0 [BRIDGE_NAME]"
     echo ""
-    echo "[-h] This Message"
+    echo "[-h --help] This Message"
     echo ""
     echo "--end--"
 }
 
 ### MAIN ###
 
-if [[ "$#" != 1 || "$1" == "-h"]]; then
+if [[ "$#" != 1 || "$1" == "-h" || "$1" == "--help"]]; then
     usage
     exit 1
 fi
