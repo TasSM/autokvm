@@ -8,11 +8,13 @@
 MACHINE_NAME=$1
 OPERATING_SYSTEM=$2
 MACHINE_CONFIG_FILE=$3
-IP_CONFIG_FILE=$4
+IP_CONFIG_FILE=
 TARGET_URL=
 INSTALL_IMAGE=
 METADATA_FILE=
 USERDATA_FILE=
+BASE_DISTRO=
+LOGIN_PASSWORD=
 
 # PATHS
 LIBVIRT_BOOT_DIR="/var/lib/libvirt/boot"
@@ -57,6 +59,7 @@ usage() {
     echo ""
     echo "$0 [hostname] [OS] [vm-config] [network-config]"
     echo ""
+    echo "Network configuration is optional addition, default will use DHCP"
     echo "For supported OS see config/operating-systems.conf"
     echo ""
     echo "[-h] This Message"
@@ -67,22 +70,33 @@ usage() {
 ### MAIN ###
 
 # Validate Parameters
-if [[ "$#" != 4 ]]; then
+if [[ "$#" < 3 || "$#" > 4 ]]; then
     usage
     exit 1
 fi
 
-# Read VM and IP configuration file
+# Process network-config if supplied
+if [ ! -z "$4" ]; then
+    echo "-- Network configuration file has been supplied --"
+    IP_CONFIG_FILE=$4
+    if [ ! -f $IP_CONFIG_FILE ]; then
+        echo "-- Network configuration file is invalid [Run with -h flag for usage] --"
+        exit 1
+    else
+        echo "-- Reading Network Configuraton --"
+        source $IP_CONFIG_FILE
+    fi
+else
+    echo "-- No network configuration supplied - configuring instance with default DHCP --"
+fi
+
+# Read VM configuration file
 if [ ! -f $MACHINE_CONFIG_FILE ]; then
-    echo "-- VM configuration file is invalid [Run with -h flag for usage]"
-    exit 1
-elif [ ! -f $IP_CONFIG_FILE ]; then
-    echo "-- IP configuration file is invalid [Run with -h flag for usage]"
+    echo "-- VM configuration file is invalid [Run with -h flag for usage] --"
     exit 1
 else
-    echo "-- Reading Machine and Network Configuration --"
+    echo "-- Reading Machine Configuration --"
     source $MACHINE_CONFIG_FILE
-    source $IP_CONFIG_FILE
 fi
 
 # Validate disk size
@@ -93,13 +107,14 @@ fi
 
 # Validate OS parameter
 TARGET_URL=$(awk -F= /$OPERATING_SYSTEM-location/'{print $2}' $OS_FILE)
-if [ -z "$TARGET_URL" ]; then
+BASE_DISTRO=$(awk -F= /$OPERATING_SYSTEM-base-distro/'{print $2}' $OS_FILE)
+if [ -z "$TARGET_URL" || -z "$BASE_DISTRO" ]; then
     echo "-- ERROR: Enter a supported operating system, see config/operating-systems.conf"
     exit 1
 fi
 
 INSTALL_IMAGE=${TARGET_URL##*/}
-TEMPLATE="$TEMPLATE_DIR/$OPERATING_SYSTEM-template.yml"
+TEMPLATE="$TEMPLATE_DIR/$BASE_DISTRO-template.yml"
 echo "-- Install Image: ${INSTALL_IMAGE} --"
 echo "-- Template: $TEMPLATE --"
 
@@ -122,19 +137,22 @@ mkdir -vp "$LIBVIRT_IMAGE_DIR/$MACHINE_NAME"
 LIBVIRT_IMAGE_DIR="$LIBVIRT_IMAGE_DIR/$MACHINE_NAME"
 METADATA_FILE="$LIBVIRT_IMAGE_DIR/meta-data"
 USERDATA_FILE="$LIBVIRT_IMAGE_DIR/user-data"
-NETWORKDATA_FILE="$LIBVIRT_IMAGE_DIR/network-config"
-echo "instance-id: $MACHINE_NAME" > $METADATA_FILE
-echo "hostname: $MACHINE_NAME" >> $METADATA_FILE
+if [ ! -z "$IP_CONFIG_FILE" ]; then
+    NETWORKDATA_FILE="$LIBVIRT_IMAGE_DIR/network-config"
 
-# Copy network config
-echo "-- Writing network configuration --"
-sed -e "s|{{IP_ADDRESS}}|$IP_ADDRESS|" \
+    # Copy network config
+    echo "-- Writing Network configuration --"
+    sed -e "s|{{IP_ADDRESS}}|$IP_ADDRESS|" \
     -e "s|{{PREFIX}}|$PREFIX|"         \
     -e "s|{{GATEWAY}}|$GATEWAY|"       \
     -e "s|{{DNS1}}|$DNS1|"             \
     -e "s|{{DNS2}}|$DNS2|" "$TEMPLATE_DIR/network-template.yml" > $NETWORKDATA_FILE
+else
+    NETWORKDATA_FILE=""
+fi
+echo "instance-id: $MACHINE_NAME" > $METADATA_FILE
+echo "hostname: $MACHINE_NAME" >> $METADATA_FILE
        
-
 # Create cloud-init userdata
 ssh-keygen -o -q -t ed25519 -C "Key for VM $MACHINE_NAME" -f "$SSH_KEY_DIRECTORY/$MACHINE_NAME" -N ""
 PUBLIC_KEY=$(cat $SSH_KEY_DIRECTORY/$MACHINE_NAME.pub)
@@ -152,8 +170,7 @@ else
     exit 1
 fi
 
-# Copy the install image
-echo "-- Creating installation image --"
+echo "-- Copying installation image --"
 cp "$LIBVIRT_BOOT_DIR/$INSTALL_IMAGE" "$LIBVIRT_IMAGE_DIR/$MACHINE_NAME.qcow2"
 
 # Create disk image for install
@@ -170,7 +187,7 @@ mkisofs -o "$LIBVIRT_IMAGE_DIR/$MACHINE_NAME-cidata.iso" -V cidata -J -r $USERDA
 virt-install --import --name $MACHINE_NAME                                           \
 --memory $RAM --vcpus $VCPUS --cpu host                                              \
 --disk $LIBVIRT_IMAGE_DIR/$MACHINE_NAME.qcow2,format=qcow2,device=disk,bus=virtio    \
---disk $LIBVIRT_IMAGE_DIR/$MACHINE_NAME-cidata.iso,device=cdrom                      \
+--disk $LIBVIRT_IMAGE_DIR/$MACHINE_NAME-cidata.iso,device=cdrom,bus=sata             \
 --network bridge=$BRIDGE_INTERFACE,model=virtio                                      \
 --os-variant $OPERATING_SYSTEM                                                       \
 --graphics $GRAPHICS                                                                 \
@@ -184,6 +201,10 @@ if [ "$PRESERVE_PUBKEY" != "true" ]; then
 fi
 
 echo "-- SSH Key for $MACHINE_NAME is located in $SSH_KEY_DIRECTORY/$MACHINE_NAME --"
-echo "-- Connect to host with: ssh $USERNAME@$IP_ADDRESS -i $SSH_KEY_DIRECTORY/$MACHINE_NAME -- "
+if [ ! -z "$IP_CONFIG_FILE" ]; then
+    echo "-- Connect to host with: ssh $USERNAME@$IP_ADDRESS -i $SSH_KEY_DIRECTORY/$MACHINE_NAME --"
+else
+    echo "-- Host configured with DHCP - Check DHCP leases on your network for the IP address of your host --"
+fi
 echo "-- DONE --"
 exit 0

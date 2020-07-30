@@ -1,0 +1,26 @@
+#cloud-config
+ 
+# Hostname management
+preserve_hostname: False
+hostname: {{HOSTNAME}}
+ 
+# Users
+users:
+  - default
+  - name: {{USER}}
+    groups: ['sudo']
+    shell: /bin/bash
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    ssh_authorized_keys:
+      - {{PUBKEY}}
+      
+output:
+  all: ">> /var/log/cloud-init.log"
+ssh_genkeytypes: ['ed25519', 'rsa']
+ssh_authorized_keys:
+  - {{PUBKEY}}
+  
+timezone: {{LOCALE}}
+runcmd:
+  - systemctl stop networking && systemctl start networking
+  - apt-get remove cloud-init

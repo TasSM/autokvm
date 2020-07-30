@@ -29,7 +29,7 @@ fi
 # Install dependencies
 echo "-- Installing Dependencies --"
 dnf module install virt -y
-dnf install virt-install virt-viewer libguestfs-tools cloud-init -y
+dnf install virt-install virt-viewer libguestfs-tools cloud-init openssl -y
 
 # Start services
 echo "-- Starting Services --"
